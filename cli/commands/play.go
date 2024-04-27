@@ -842,6 +842,7 @@ func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 func convertRulesSnakes(snakes []rules.Snake, snakeStates map[string]SnakeState) []client.Snake {
 	a := make([]client.Snake, 0)
 	for _, snake := range snakes {
+		// This is how the board doesn't include eliminated snakes
 		if snake.EliminatedCause == rules.NotEliminated {
 			a = append(a, convertRulesSnake(snake, snakeStates[snake.ID]))
 		}

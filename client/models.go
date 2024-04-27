@@ -36,10 +36,10 @@ type Board struct {
 
 // Snake represents information about a snake in the game
 type Snake struct {
+	Move           *string        `json:"move,omitempty"`
 	ID             string         `json:"id"`
 	Name           string         `json:"name"`
 	Latency        string         `json:"latency"`
-	Move        *string        `json:"move,omitempty"`
 	Health         int            `json:"health"`
 	Body           []Coord        `json:"body"`
 	Head           Coord          `json:"head"`
