@@ -10,6 +10,12 @@ type SnakeRequest struct {
 	You   Snake `json:"you"`
 }
 
+type SnakeStateAction struct {
+	Game  Game  `json:"game"`
+	Turn  int   `json:"turn"`
+	Board Board `json:"board"`
+}
+
 // Game represents the current game state
 type Game struct {
 	ID      string  `json:"id"`
@@ -33,7 +39,7 @@ type Snake struct {
 	ID             string         `json:"id"`
 	Name           string         `json:"name"`
 	Latency        string         `json:"latency"`
-	LastMove       *string        `json:"lastMove,omitempty"`
+	Move        *string        `json:"move,omitempty"`
 	Health         int            `json:"health"`
 	Body           []Coord        `json:"body"`
 	Head           Coord          `json:"head"`

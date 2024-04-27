@@ -192,6 +192,7 @@ func (gameState *GameState) Run() error {
 	}
 
 	gameExporter := GameExporter{
+		// The first line of the output
 		game:          gameState.createClientGame(),
 		snakeRequests: make([]client.SnakeRequest, 0),
 		winner:        SnakeState{},
@@ -244,20 +245,20 @@ func (gameState *GameState) Run() error {
 	}
 
 	// Export game first, if enabled, so that we capture the request for turn zero.
-	if exportGame {
-		// The output file was designed in a way so that (nearly) every entry is equivalent to a valid API request.
-		// This is meant to help unlock further development of tools such as replaying a saved game by simply copying each line and sending it as a POST request.
-		// There was a design choice to be made here: the difference between SnakeRequest and BoardState is the `you` key.
-		// We could choose to either store the SnakeRequest of each snake OR to omit the `you` key OR fill the `you` key with one of the snakes
-		// In all cases the API request is technically non-compliant with how the actual API request should be.
-		// The third option (filling the `you` key with an arbitrary snake) is the closest to the actual API request that would need the least manipulation to
-		// be adjusted to look like an API call for a specific snake in the game.
-		for _, snakeState := range gameState.snakeStates {
-			snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
-			gameExporter.AddSnakeRequest(snakeRequest)
-			break
-		}
-	}
+	// if exportGame {
+	// 	// The output file was designed in a way so that (nearly) every entry is equivalent to a valid API request.
+	// 	// This is meant to help unlock further development of tools such as replaying a saved game by simply copying each line and sending it as a POST request.
+	// 	// There was a design choice to be made here: the difference between SnakeRequest and BoardState is the `you` key.
+	// 	// We could choose to either store the SnakeRequest of each snake OR to omit the `you` key OR fill the `you` key with one of the snakes
+	// 	// In all cases the API request is technically non-compliant with how the actual API request should be.
+	// 	// The third option (filling the `you` key with an arbitrary snake) is the closest to the actual API request that would need the least manipulation to
+	// 	// be adjusted to look like an API call for a specific snake in the game.
+	// 	for _, snakeState := range gameState.snakeStates {
+	// 		snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
+	// 		gameExporter.AddSnakeRequest(snakeRequest)
+	// 		break
+	// 	}
+	// }
 
 	var endTime time.Time
 	for !gameOver {
@@ -265,7 +266,7 @@ func (gameState *GameState) Run() error {
 			endTime = time.Now().Add(time.Duration(gameState.TurnDuration) * time.Millisecond)
 		}
 
-		gameOver, boardState, err = gameState.createNextBoardState(boardState)
+		gameOver, boardState, err = gameState.createNextBoardState(boardState, exportGame, &gameExporter)
 		if err != nil {
 			return fmt.Errorf("Error processing game: %w", err)
 		}
@@ -293,14 +294,14 @@ func (gameState *GameState) Run() error {
 			boardServer.SendEvent(gameState.buildFrameEvent(boardState))
 		}
 
-		if exportGame {
-			for _, snakeState := range gameState.snakeStates {
-				snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
-				// Can add lastMove here as move for the current turn
-				gameExporter.AddSnakeRequest(snakeRequest)
-				break
-			}
-		}
+		// if exportGame {
+		// 	for _, snakeState := range gameState.snakeStates {
+		// 		snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
+		// 		// Can add lastMove here as move for the current turn
+		// 		gameExporter.AddSnakeRequest(snakeRequest)
+		// 		break
+		// 	}
+		// }
 	}
 
 	gameExporter.isDraw = false
@@ -375,14 +376,14 @@ func (gameState *GameState) initializeBoardFromArgs() (bool, *rules.BoardState, 
 	return gameOver, boardState, nil
 }
 
-func (gameState *GameState) createNextBoardState(boardState *rules.BoardState) (bool, *rules.BoardState, error) {
+func (gameState *GameState) createNextBoardState(boardState *rules.BoardState, exportGame bool, gameExporter *GameExporter) (bool, *rules.BoardState, error) {
 	// apply PreUpdateBoard before making requests to snakes
 	boardState, err := maps.PreUpdateBoard(gameState.gameMap, boardState, gameState.ruleset.Settings())
 	if err != nil {
 		return false, boardState, fmt.Errorf("Error pre-updating board with game map: %w", err)
 	}
 
-	// get moves from snakes
+	// get moves from snakes through HTTP requests
 	stateUpdates := make(chan SnakeState, len(gameState.snakeStates))
 	if gameState.Sequential {
 		for _, snakeState := range gameState.snakeStates {
@@ -414,11 +415,30 @@ func (gameState *GameState) createNextBoardState(boardState *rules.BoardState) (
 		close(stateUpdates)
 	}
 
+	// Update the snake states with the moves
 	var moves []rules.SnakeMove
 	for snakeState := range stateUpdates {
 		gameState.snakeStates[snakeState.ID] = snakeState
 		moves = append(moves, rules.SnakeMove{ID: snakeState.ID, Move: snakeState.LastMove})
 	}
+
+	// All snakes have submitted their moves
+
+	// ------------------------------
+
+	// This is a hack and only works because the board has not been updated yet. We want to log the state of the board and the actions of the snakes.
+
+	// Therefore, we log the state of the board and the snake actions before the board is updated.
+
+	if exportGame {
+		for _, snakeState := range gameState.snakeStates {
+			snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
+			gameExporter.AddSnakeRequest(snakeRequest)
+			break
+		}
+	}
+
+	// ------------------------------
 
 	gameOver, boardState, err := gameState.ruleset.Execute(boardState, moves)
 	if err != nil {
@@ -798,7 +818,7 @@ func serialiseSnakeRequest(snakeRequest client.SnakeRequest) []byte {
 
 func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 	latencyMS := snakeState.Latency.Milliseconds()
-	lastMove := snakeState.LastMove
+	move := snakeState.LastMove
 
 	return client.Snake{
 		ID:      snake.ID,
@@ -806,7 +826,7 @@ func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 		Health:  snake.Health,
 		Body:    client.CoordFromPointArray(snake.Body),
 		Latency: fmt.Sprint(latencyMS),
-		LastMove: &lastMove,
+		Move: 	 &move,
 		Head:    client.CoordFromPoint(snake.Body[0]),
 		Length:  int(len(snake.Body)),
 		Shout:   "",

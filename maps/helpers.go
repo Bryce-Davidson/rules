@@ -38,6 +38,7 @@ func PreUpdateBoard(gameMap GameMap, previousBoardState *rules.BoardState, setti
 	return nextBoardState, nil
 }
 
+
 func PostUpdateBoard(gameMap GameMap, previousBoardState *rules.BoardState, settings rules.Settings) (*rules.BoardState, error) {
 	nextBoardState := previousBoardState.Clone()
 	editor := NewBoardStateEditor(nextBoardState)
