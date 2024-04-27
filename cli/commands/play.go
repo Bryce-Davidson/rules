@@ -432,6 +432,7 @@ func (gameState *GameState) createNextBoardState(boardState *rules.BoardState, e
 
 	if exportGame {
 		for _, snakeState := range gameState.snakeStates {
+			// This works because the lastMove property has been updated in the snakeState above.
 			snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
 			gameExporter.AddSnakeRequest(snakeRequest)
 			break
@@ -821,12 +822,12 @@ func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 	move := snakeState.LastMove
 
 	return client.Snake{
+		Move: 	 &move,
 		ID:      snake.ID,
 		Name:    snakeState.Name,
 		Health:  snake.Health,
 		Body:    client.CoordFromPointArray(snake.Body),
 		Latency: fmt.Sprint(latencyMS),
-		Move: 	 &move,
 		Head:    client.CoordFromPoint(snake.Body[0]),
 		Length:  int(len(snake.Body)),
 		Shout:   "",
