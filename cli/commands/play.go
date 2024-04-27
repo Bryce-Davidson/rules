@@ -796,12 +796,15 @@ func serialiseSnakeRequest(snakeRequest client.SnakeRequest) []byte {
 
 func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 	latencyMS := snakeState.Latency.Milliseconds()
+	lastMove := snakeState.LastMove
+
 	return client.Snake{
 		ID:      snake.ID,
 		Name:    snakeState.Name,
 		Health:  snake.Health,
 		Body:    client.CoordFromPointArray(snake.Body),
 		Latency: fmt.Sprint(latencyMS),
+		LastMove: &lastMove,
 		Head:    client.CoordFromPoint(snake.Body[0]),
 		Length:  int(len(snake.Body)),
 		Shout:   "",
