@@ -296,6 +296,7 @@ func (gameState *GameState) Run() error {
 		if exportGame {
 			for _, snakeState := range gameState.snakeStates {
 				snakeRequest := gameState.getRequestBodyForSnake(boardState, snakeState)
+				// Can add lastMove here as move for the current turn
 				gameExporter.AddSnakeRequest(snakeRequest)
 				break
 			}
@@ -345,6 +346,7 @@ func (gameState *GameState) Run() error {
 	return nil
 }
 
+// This is the start request for the snakes
 func (gameState *GameState) initializeBoardFromArgs() (bool, *rules.BoardState, error) {
 	snakeIds := []string{}
 	for _, snakeState := range gameState.snakeStates {
@@ -594,7 +596,7 @@ func (gameState *GameState) buildSnakesFromOptions() (map[string]SnakeState, err
 		}
 
 		snakeState := SnakeState{
-			Name: snakeName, URL: snakeURL, ID: id, LastMove: "up", Character: bodyChars[i%8],
+			Name: snakeName, URL: snakeURL, ID: id, LastMove: "null", Character: bodyChars[i%8],
 		}
 		var snakeErr error
 		res, _, err := gameState.httpClient.Get(snakeURL)
@@ -796,12 +798,15 @@ func serialiseSnakeRequest(snakeRequest client.SnakeRequest) []byte {
 
 func convertRulesSnake(snake rules.Snake, snakeState SnakeState) client.Snake {
 	latencyMS := snakeState.Latency.Milliseconds()
+	lastMove := snakeState.LastMove
+
 	return client.Snake{
 		ID:      snake.ID,
 		Name:    snakeState.Name,
 		Health:  snake.Health,
 		Body:    client.CoordFromPointArray(snake.Body),
 		Latency: fmt.Sprint(latencyMS),
+		LastMove: &lastMove,
 		Head:    client.CoordFromPoint(snake.Body[0]),
 		Length:  int(len(snake.Body)),
 		Shout:   "",
